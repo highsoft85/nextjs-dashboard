@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { sql } from '@vercel/postgres';
+import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -58,11 +58,15 @@ export async function createInvoice(prevState: State, formData: FormData) {
   const date = new Date().toISOString().split('T')[0];
 
   try {
-    await sql`
-      INSERT INTO invoices (customer_id, amount, status, date) 
-      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
-    `;
-  } catch (error) {
+    await prisma.invoices.create({
+      data: {
+        customer_id: customerId,
+        amount: amountInCents,
+        status: status,
+        date: new Date(date),
+      },
+    });
+  } catch (error) { console.log(error);
     return {
       message: 'Database Error: Failed to Create Invoice.',
     }
@@ -92,11 +96,14 @@ export async function updateInvoice(id: string, prevState: State, formData: Form
   const amountInCents = amount * 100;
 
   try {
-    await sql`
-      UPDATE invoices 
-      SET customer_id=${customerId}, amount=${amountInCents}, status=${status}
-      WHERE id=${id}
-    `;
+    await prisma.invoices.update({
+      where: {id: `${id}`},
+      data: {
+        customer_id: customerId,
+        amount: amountInCents,
+        status: status,
+      },
+    });
   } catch (error) {
     return {
       message: 'Database Error: Failed to Update Invoice.',
@@ -112,7 +119,7 @@ export async function deleteInvoice(id: string) {
 //  throw new Error('Falied to Delete Invoice'); // Test Error triggering
 
   try {
-    await sql`DELETE FROM invoices WHERE id = ${id}`;
+    await prisma.invoices.delete({where: {id: `${id}`}});
     revalidatePath('/dashboard/invoices');
     return { message: 'Deleted Invoice.' };
   } catch (error) {
