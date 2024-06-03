@@ -18,7 +18,7 @@ export async function fetchRevenue() {
   noStore();
 
   try {
-    const data: Revenue = await prisma.revenue.findMany();
+    const data = await prisma.revenue.findMany();
     return data;
   } catch (error) {
     console.error('Database Error:', error);
@@ -30,7 +30,7 @@ export async function fetchLatestInvoices() {
   noStore();
 
   try {
-    const data: LatestInvoiceRaw = await prisma.$queryRaw`
+    const data = await prisma.$queryRaw`
       SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
       FROM invoices
       JOIN customers ON invoices.customer_id = customers.id
