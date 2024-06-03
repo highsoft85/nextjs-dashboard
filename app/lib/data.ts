@@ -174,7 +174,7 @@ export async function fetchCustomers() {
   noStore();
 
   try {
-    const data: CustomerField = await prisma.customers.findMany({
+    const data: CustomerField[] = await prisma.customers.findMany({
       select: {
         id: true,
         name: true,
