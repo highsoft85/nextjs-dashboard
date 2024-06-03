@@ -4,8 +4,6 @@ import AppLogo from '@/app/ui/app-logo';
 import { PowerIcon } from '@heroicons/react/24/outline';
 import { signOut } from '@/auth';
 
-// import { signOut } from '@/auth';
-
 export default function SideNav() {
   return (
     <div className="flex h-full flex-col px-3 py-4 md:px-2">
