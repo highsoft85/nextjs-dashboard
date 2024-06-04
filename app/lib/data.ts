@@ -5,11 +5,11 @@ import {
   InvoicesTable,
   LatestInvoiceRaw,
   User,
-  Revenue,
+  Revenue, Invoice, FormattedCustomersTable,
 } from './definitions';
 import { formatCurrency } from './utils';
 import { unstable_noStore as noStore } from 'next/cache';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaPromise, Prisma } from '@prisma/client';
 import prisma from './prisma';
 
 export async function fetchRevenue() {
@@ -19,6 +19,7 @@ export async function fetchRevenue() {
 
   try {
     const data = await prisma.revenue.findMany();
+
     return data;
   } catch (error) {
     console.error('Database Error:', error);
@@ -30,7 +31,7 @@ export async function fetchLatestInvoices() {
   noStore();
 
   try {
-    const data = await prisma.$queryRaw`
+    const data: any[] = await prisma.$queryRaw`
       SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
       FROM invoices
       JOIN customers ON invoices.customer_id = customers.id
@@ -62,7 +63,7 @@ export async function fetchCardData() {
     const customerCountPromise = prisma.customers.aggregate({
       _count: true,
     });
-    const invoiceStatusPromise = prisma.$queryRaw`
+    const invoiceStatusPromise: object = prisma.$queryRaw`
       SELECT
         SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
         SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
@@ -76,8 +77,9 @@ export async function fetchCardData() {
 
     const numberOfInvoices = Number(data[0]._count ?? '0');
     const numberOfCustomers = Number(data[1]._count ?? '0');
-    const totalPaidInvoices = formatCurrency(Number(data[2][0].paid) ?? '0');
-    const totalPendingInvoices = formatCurrency(Number(data[2][0].pending) ?? '0');
+    const temp = data[2][0] as {paid: bigint, pending: bigint};
+    const totalPaidInvoices = formatCurrency(Number(temp.paid) ?? 0);
+    const totalPendingInvoices = formatCurrency(Number(temp.pending) ?? 0);
 
     return {
       numberOfCustomers,
@@ -101,7 +103,7 @@ export async function fetchFilteredInvoices(
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   try {
-    const invoices: InvoicesTable = await prisma.$queryRaw`
+    const invoices: InvoicesTable[] = await prisma.$queryRaw`
       SELECT
         invoices.id,
         invoices.amount,
@@ -133,7 +135,7 @@ export async function fetchInvoicesPages(query: string) {
   noStore();
 
   try {
-    const count = await prisma.$queryRaw`
+    const data: Array<{count: number}> = await prisma.$queryRaw`
         SELECT COUNT(*)
         FROM invoices
         JOIN customers ON invoices.customer_id = customers.id
@@ -145,7 +147,7 @@ export async function fetchInvoicesPages(query: string) {
           invoices.status ILIKE ${`%${query}%`}
         `;
 
-    const totalPages = Math.ceil(Number(count[0].count) / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(Number(data[0].count) / ITEMS_PER_PAGE);
     return totalPages;
   } catch (error) {
     console.error('Database Error:', error);
@@ -157,10 +159,10 @@ export async function fetchInvoiceById(id: string) {
   noStore();
 
   try {
-    const data: InvoiceForm = await prisma.invoices.findFirst({
+    const data = await prisma.invoices.findFirst({
       where: {id: `${id}`}
     });
-    const invoice = data;
+    const invoice = data as InvoiceForm;
     invoice.amount = invoice.amount / 100;
 
     return invoice;
@@ -195,28 +197,28 @@ export async function fetchFilteredCustomers(query: string) {
   noStore();
 
   try {
-    const data = await sql<CustomersTableType>`
-		SELECT
-		  customers.id,
-		  customers.name,
-		  customers.email,
-		  customers.image_url,
-		  COUNT(invoices.id) AS total_invoices,
-		  SUM(CASE WHEN invoices.status = 'pending' THEN invoices.amount ELSE 0 END) AS total_pending,
-		  SUM(CASE WHEN invoices.status = 'paid' THEN invoices.amount ELSE 0 END) AS total_paid
-		FROM customers
-		LEFT JOIN invoices ON customers.id = invoices.customer_id
-		WHERE
-		  customers.name ILIKE ${`%${query}%`} OR
-        customers.email ILIKE ${`%${query}%`}
-		GROUP BY customers.id, customers.name, customers.email, customers.image_url
-		ORDER BY customers.name ASC
-	  `;
+    const data: Array<FormattedCustomersTable> = await prisma.$queryRaw`
+      SELECT
+        customers.id,
+        customers.name,
+        customers.email,
+        customers.image_url,
+        COUNT(invoices.id) AS total_invoices,
+        SUM(CASE WHEN invoices.status = 'pending' THEN invoices.amount ELSE 0 END) AS total_pending,
+        SUM(CASE WHEN invoices.status = 'paid' THEN invoices.amount ELSE 0 END) AS total_paid
+      FROM customers
+      LEFT JOIN invoices ON customers.id = invoices.customer_id
+      WHERE
+        customers.name ILIKE ${`%${query}%`} OR
+          customers.email ILIKE ${`%${query}%`}
+      GROUP BY customers.id, customers.name, customers.email, customers.image_url
+      ORDER BY customers.name ASC
+      `;
 
-    const customers = data.rows.map((customer) => ({
+    const customers = data.map((customer) => ({
       ...customer,
-      total_pending: formatCurrency(customer.total_pending),
-      total_paid: formatCurrency(customer.total_paid),
+      total_pending: formatCurrency(Number(customer.total_pending)),
+      total_paid: formatCurrency(Number(customer.total_paid)),
     }));
 
     return customers;
