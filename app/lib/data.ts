@@ -9,7 +9,6 @@ import {
 } from './definitions';
 import { formatCurrency } from './utils';
 import { unstable_noStore as noStore } from 'next/cache';
-import { Prisma } from '@prisma/client';
 import prisma from './prisma';
 
 export async function fetchRevenue() {
