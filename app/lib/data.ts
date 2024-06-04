@@ -7,7 +7,7 @@ import {
   User,
   Revenue, Invoice, FormattedCustomersTable,
 } from './definitions';
-import { formatCurrency } from './utils';
+import { formatCurrency, flatten } from './utils';
 import { unstable_noStore as noStore } from 'next/cache';
 import prisma from './prisma';
 
@@ -30,16 +30,30 @@ export async function fetchLatestInvoices() {
   noStore();
 
   try {
-    const data: any[] = await prisma.$queryRaw`
-      SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
-      ORDER BY invoices.date DESC
-      LIMIT 5`;
+    const data = await prisma.invoices.findMany({
+      relationLoadStrategy: 'join',
+      select: {
+        id: true,
+        amount: true,
+        customer: {
+          select: {
+            name: true,
+            image_url: true,
+            email: true,
+          },
+        },
+      },
+      take: 5,
+    });
+
     const latestInvoices = data.map((invoice) => ({
-      ...invoice,
+      id: invoice.id,
+      name: invoice.customer.name,
+      image_url: invoice.customer.image_url,
+      email: invoice.customer.email,
       amount: formatCurrency(invoice.amount),
     }));
+
     return latestInvoices;
   } catch (e) {
     console.error('Database Error:', e);
@@ -100,26 +114,32 @@ export async function fetchFilteredInvoices(
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   try {
-    const invoices: InvoicesTable[] = await prisma.$queryRaw`
-      SELECT
-        invoices.id,
-        invoices.amount,
-        invoices.date,
-        invoices.status,
-        customers.name,
-        customers.email,
-        customers.image_url
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
-      WHERE
-        customers.name ILIKE ${`%${query}%`} OR
-        customers.email ILIKE ${`%${query}%`} OR
-        invoices.amount::text ILIKE ${`%${query}%`} OR
-        invoices.date::text ILIKE ${`%${query}%`} OR
-        invoices.status ILIKE ${`%${query}%`}
-      ORDER BY invoices.date DESC
-      LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
-    `;
+    const data = await prisma.invoices.findMany({
+      relationLoadStrategy: 'join',
+      include: {
+        customer: {
+          select: {
+            name: true,
+            image_url: true,
+            email: true,
+          },
+        },
+      },
+      where: {
+        OR: [
+          {status: {contains: query, mode: 'insensitive'}},
+          {customer: {name: {contains: query, mode: 'insensitive'}}},
+          {customer: {email: {contains: query, mode: 'insensitive'}}},
+        ],
+      },
+      orderBy: {date: 'desc'},
+      skip: offset,
+      take: ITEMS_PER_PAGE,
+    });
+
+    const invoices = data.map((invoice) =>
+      flatten(invoice) as InvoicesTable
+    );
 
     return invoices;
   } catch (error) {
@@ -132,19 +152,18 @@ export async function fetchInvoicesPages(query: string) {
   noStore();
 
   try {
-    const data: Array<{count: number}> = await prisma.$queryRaw`
-        SELECT COUNT(*)
-        FROM invoices
-        JOIN customers ON invoices.customer_id = customers.id
-        WHERE
-          customers.name ILIKE ${`%${query}%`} OR
-          customers.email ILIKE ${`%${query}%`} OR
-          invoices.amount::text ILIKE ${`%${query}%`} OR
-          invoices.date::text ILIKE ${`%${query}%`} OR
-          invoices.status ILIKE ${`%${query}%`}
-        `;
+    const data = await prisma.invoices.aggregate({
+      _count: true,
+      where: {
+        OR: [
+          {status: {contains: query, mode: 'insensitive'}},
+          {customer: {name: {contains: query, mode: 'insensitive'}}},
+          {customer: {email: {contains: query, mode: 'insensitive'}}},
+        ],
+      },
+    });
 
-    const totalPages = Math.ceil(Number(data[0].count) / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(Number(data._count) / ITEMS_PER_PAGE);
     return totalPages;
   } catch (error) {
     console.error('Database Error:', error);
@@ -194,6 +213,28 @@ export async function fetchFilteredCustomers(query: string) {
   noStore();
 
   try {
+    // const data = await prisma.invoices.findMany({
+    //   relationLoadStrategy: 'join',
+    //   include: {
+    //     customer: {
+    //       select: {
+    //         name: true,
+    //         image_url: true,
+    //         email: true,
+    //       },
+    //     },
+    //   },
+    //   where: {
+    //     OR: [
+    //       {status: {contains: query, mode: 'insensitive'}},
+    //       {customer: {name: {contains: query, mode: 'insensitive'}}},
+    //       {customer: {email: {contains: query, mode: 'insensitive'}}},
+    //     ],
+    //   },
+    //   orderBy: {date: 'desc'},
+    //   skip: offset,
+    //   take: ITEMS_PER_PAGE,
+    // });
     const data: Array<FormattedCustomersTable> = await prisma.$queryRaw`
       SELECT
         customers.id,

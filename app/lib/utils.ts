@@ -67,3 +67,15 @@ export const generatePagination = (currentPage: number, totalPages: number) => {
     totalPages,
   ];
 };
+
+export const flatten = function(obj = {}) {
+  const doneObject = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v == "object" && !(v instanceof  Date) && !Array.isArray(v) && !(v instanceof RegExp)) {
+      Object.assign(doneObject, flatten(v))
+    } else {
+      doneObject[k] = v
+    }
+  }
+  return doneObject
+}
