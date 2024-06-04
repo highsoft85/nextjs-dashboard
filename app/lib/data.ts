@@ -213,28 +213,6 @@ export async function fetchFilteredCustomers(query: string) {
   noStore();
 
   try {
-    // const data = await prisma.invoices.findMany({
-    //   relationLoadStrategy: 'join',
-    //   include: {
-    //     customer: {
-    //       select: {
-    //         name: true,
-    //         image_url: true,
-    //         email: true,
-    //       },
-    //     },
-    //   },
-    //   where: {
-    //     OR: [
-    //       {status: {contains: query, mode: 'insensitive'}},
-    //       {customer: {name: {contains: query, mode: 'insensitive'}}},
-    //       {customer: {email: {contains: query, mode: 'insensitive'}}},
-    //     ],
-    //   },
-    //   orderBy: {date: 'desc'},
-    //   skip: offset,
-    //   take: ITEMS_PER_PAGE,
-    // });
     const data: Array<FormattedCustomersTable> = await prisma.$queryRaw`
       SELECT
         customers.id,
@@ -254,10 +232,14 @@ export async function fetchFilteredCustomers(query: string) {
       `;
 
     const customers = data.map((customer) => ({
-      ...customer,
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      image_url: customer.image_url,
+      total_invoices: Number(customer.total_invoices),
       total_pending: formatCurrency(Number(customer.total_pending)),
       total_paid: formatCurrency(Number(customer.total_paid)),
-    }));
+    } as FormattedCustomersTable));
 
     return customers;
   } catch (err) {
