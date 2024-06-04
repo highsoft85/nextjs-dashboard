@@ -43,10 +43,8 @@ export async function fetchLatestInvoices() {
     }));
     return latestInvoices;
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError)
-      console.log('Prisma ', e);
     console.error('Database Error:', e);
-    // throw new Error('Failed to fetch the latest invoices.');
+    throw new Error('Failed to fetch the latest invoices.');
   }
 }
 
