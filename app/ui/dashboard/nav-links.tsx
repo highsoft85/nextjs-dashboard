@@ -9,7 +9,8 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
-import { SessionProvider } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { useEffect, useState } from 'react';
 
 // Map of links to display in the side navigation.
 // Depending on the size of the application, this would be stored in a database.
@@ -21,10 +22,17 @@ const links = [
 
 export default function NavLinks() {
   const pathname = usePathname();
-  //const session = useSession();
+  const { data: session, update } = useSession();
+  const [user, setUser] = useState({});
+
+  useEffect(() => {
+    if (session && session.user) {
+      setUser(session.user);
+    }
+  }, [session]);
 
   return (
-    <SessionProvider>
+    <>
       {links.map((link) => {
           const LinkIcon = link.icon;
           return (
@@ -43,7 +51,7 @@ export default function NavLinks() {
           </Link>
         );
       })}
-      {/*<p>Welcome {session?.user?.name}</p>*/}
-    </SessionProvider>
+      <p>Welcome {session?.user?.name}</p>
+    </>
   );
 }
