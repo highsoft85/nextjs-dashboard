@@ -68,17 +68,16 @@ export async function fetchCardData() {
     // You can probably combine these into a single SQL query
     // However, we are intentionally splitting them to demonstrate
     // how to initialize multiple queries in parallel with JS.
-    const invoiceCountPromise = prisma.invoices.aggregate({
-      _count: true,
-    });
+    const invoiceCountPromise = prisma.invoices.count();
     const customerCountPromise = prisma.customers.aggregate({
       _count: true,
     });
-    const invoiceStatusPromise: object = prisma.$queryRaw`
-      SELECT
-        SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS "paid",
-        SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) AS "pending"
-      FROM invoices`;
+    const invoiceStatusPromise: object = prisma.invoices.groupBy({
+      _sum: {
+        amount: true,
+      },
+      by: ['status'],
+    })
 
     const data = await Promise.all([
       invoiceCountPromise,
@@ -86,11 +85,10 @@ export async function fetchCardData() {
       invoiceStatusPromise,
     ]);
 
-    const numberOfInvoices = Number(data[0]._count ?? '0');
+    const numberOfInvoices = Number(data[0] ?? '0');
     const numberOfCustomers = Number(data[1]._count ?? '0');
-    const temp = data[2][0] as {paid: bigint, pending: bigint};
-    const totalPaidInvoices = formatCurrency(Number(temp.paid) ?? 0);
-    const totalPendingInvoices = formatCurrency(Number(temp.pending) ?? 0);
+    const totalPaidInvoices = formatCurrency(data[2].find(item => item.status == "paid")?._sum.amount ?? 0);
+    const totalPendingInvoices = formatCurrency(data[2].find(item => item.status == "pending")?._sum.amount ?? 0);
 
     return {
       numberOfCustomers,

@@ -18,7 +18,7 @@ export default function LoginPage() {
             <AppLogo/>
           </div>
         </div>
-        <LoginForm />
+        <LoginForm/>
         <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-4">
           <form
             action={async () => {
