@@ -87,8 +87,9 @@ export async function fetchCardData() {
 
     const numberOfInvoices = Number(data[0] ?? '0');
     const numberOfCustomers = Number(data[1]._count ?? '0');
-    const totalPaidInvoices = formatCurrency(data[2].find(item => item.status == "paid")?._sum.amount ?? 0);
-    const totalPendingInvoices = formatCurrency(data[2].find(item => item.status == "pending")?._sum.amount ?? 0);
+    const temp = data[2] as {_sum: {amount: number}, status: string}[];
+    const totalPaidInvoices = formatCurrency(temp.find(item => item.status == "paid")?._sum.amount ?? 0);
+    const totalPendingInvoices = formatCurrency(temp.find(item => item.status == "pending")?._sum.amount ?? 0);
 
     return {
       numberOfCustomers,
